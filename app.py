@@ -5,6 +5,14 @@ import os
 
 load_dotenv()
 
+
+def _get_secret(key: str) -> str:
+    """st.secrets（Streamlit Cloud）→ os.getenv（ローカル）の順で取得"""
+    try:
+        return st.secrets.get(key, os.getenv(key, ""))
+    except Exception:
+        return os.getenv(key, "")
+
 st.set_page_config(
     page_title="競合記事分析ツール",
     page_icon="🔍",
@@ -19,13 +27,13 @@ with st.sidebar:
     st.header("⚙️ API設定")
     apify_key = st.text_input(
         "Apify APIキー",
-        value=os.getenv("APIFY_API_KEY", ""),
+        value=_get_secret("APIFY_API_KEY"),
         type="password",
         help="https://console.apify.com/account/integrations からコピー",
     )
     claude_key = st.text_input(
         "Claude APIキー",
-        value=os.getenv("ANTHROPIC_API_KEY", ""),
+        value=_get_secret("ANTHROPIC_API_KEY"),
         type="password",
         help="https://console.anthropic.com/settings/api-keys からコピー",
     )
@@ -64,12 +72,16 @@ if run_button:
     if not custom_keyword.strip():
         st.error("検索キーワードを入力してください")
         st.stop()
-    if not apify_key:
+    effective_apify_key = apify_key or _get_secret("APIFY_API_KEY")
+    effective_claude_key = claude_key or _get_secret("ANTHROPIC_API_KEY")
+    if not effective_apify_key:
         st.error("Apify APIキーを入力してください")
         st.stop()
-    if not claude_key:
+    if not effective_claude_key:
         st.error("Claude APIキーを入力してください")
         st.stop()
+    apify_key = effective_apify_key
+    claude_key = effective_claude_key
 
     # Step 1: Scrape own article
     with st.status("自分の記事を取得中...", expanded=True) as status:
