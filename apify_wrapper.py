@@ -18,7 +18,7 @@ _PAGE_FN = """async function pageFunction(context) {
     const body = $('article,main,[id*="content"],[class*="content"],body').first();
     const lines = body.text().split('\\n').map(function(l){ return l.trim(); }).filter(Boolean);
     const content = lines.join('\\n').slice(0, 6000);
-    return { title: title || 'タイトル不明', metaDesc: metaDesc, headings: headings,
+    return { url: request.url, title: title || 'タイトル不明', metaDesc: metaDesc, headings: headings,
              content: content, wordCount: lines.join('\\n').length };
 }"""
 
