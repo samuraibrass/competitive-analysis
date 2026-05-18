@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from typing import List, Tuple
+from urllib.parse import urlparse
 
 
 HEADERS = {
@@ -33,7 +34,7 @@ def scrape_article(url: str) -> dict:
         headings = _extract_headings(soup)
         content, word_count = _extract_content(soup)
 
-        return {
+        result = {
             "url": url,
             "title": title,
             "meta_description": meta_desc,
@@ -42,6 +43,13 @@ def scrape_article(url: str) -> dict:
             "word_count": word_count,
             "error": None,
         }
+
+        if word_count < 100:
+            wp_data = _try_wp_api(url)
+            if wp_data:
+                result.update(wp_data)
+
+        return result
     except Exception as e:
         return {
             "url": url,
@@ -115,3 +123,46 @@ def _extract_content(soup: BeautifulSoup) -> Tuple[str, int]:
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     text = "\n".join(lines)
     return text[:6000], len(text)
+
+
+def _try_wp_api(url: str) -> dict | None:
+    parsed = urlparse(url)
+    parts = [p for p in parsed.path.split("/") if p]
+    if not parts:
+        return None
+    slug = parts[-1]
+    api_url = f"{parsed.scheme}://{parsed.netloc}/wp-json/wp/v2/posts?slug={slug}"
+    try:
+        resp = requests.get(api_url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return None
+        posts = resp.json()
+        if not posts:
+            return None
+        post = posts[0]
+
+        title = BeautifulSoup(post.get("title", {}).get("rendered", ""), "lxml").get_text().strip()
+        content_html = post.get("content", {}).get("rendered", "")
+        content_soup = BeautifulSoup(content_html, "lxml")
+
+        headings = []
+        for tag in content_soup.find_all(["h1", "h2", "h3"]):
+            text = tag.text.strip()
+            if text and len(text) < 200:
+                headings.append(f"[{tag.name.upper()}] {text}")
+
+        content_text = content_soup.get_text(separator="\n", strip=True)
+        lines = [l.strip() for l in content_text.splitlines() if l.strip()]
+        content_text = "\n".join(lines)
+
+        excerpt = BeautifulSoup(post.get("excerpt", {}).get("rendered", ""), "lxml").get_text().strip()
+
+        return {
+            "title": title or "タイトル不明",
+            "meta_description": excerpt,
+            "headings": headings,
+            "content": content_text[:6000],
+            "word_count": len(content_text),
+        }
+    except Exception:
+        return None
