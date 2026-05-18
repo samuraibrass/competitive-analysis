@@ -72,12 +72,39 @@ def get_top10_competitors(keyword: str, api_key: str, country: str = "jp") -> Li
 
     urls = _extract_urls(items)
 
-    competitors = []
-    for url in urls:
-        article = scrape_article(url)
-        competitors.append(article)
+    return _scrape_urls_with_apify(urls, api_key)
 
-    return competitors
+
+def _scrape_urls_with_apify(urls: List[str], api_key: str) -> List[dict]:
+    if not urls:
+        return []
+    client = ApifyClient(api_key)
+    try:
+        run = client.actor("apify/cheerio-scraper").call(run_input={
+            "startUrls": [{"url": u} for u in urls],
+            "pageFunction": _PAGE_FN,
+            "maxRequestsPerCrawl": len(urls),
+        })
+        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        by_url = {item.get("url", ""): item for item in items}
+        results = []
+        for url in urls:
+            item = by_url.get(url)
+            if item:
+                results.append({
+                    "url": url,
+                    "title": item.get("title", "タイトル不明"),
+                    "meta_description": item.get("metaDesc", ""),
+                    "headings": item.get("headings", []),
+                    "content": item.get("content", ""),
+                    "word_count": item.get("wordCount", 0),
+                    "error": None,
+                })
+            else:
+                results.append(scrape_article(url))
+        return results
+    except Exception:
+        return [scrape_article(url) for url in urls]
 
 
 def _extract_urls(items: list) -> List[str]:
