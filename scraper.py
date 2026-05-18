@@ -26,11 +26,12 @@ def scrape_article(url: str) -> dict:
         resp.encoding = _detect_encoding(resp)
         soup = BeautifulSoup(resp.text, "lxml")
 
+        title = _extract_title(soup)
+        meta_desc = _extract_meta(soup)
+
         for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
             tag.decompose()
 
-        title = _extract_title(soup)
-        meta_desc = _extract_meta(soup)
         headings = _extract_headings(soup)
         content, word_count = _extract_content(soup)
 
@@ -88,7 +89,11 @@ def _extract_title(soup: BeautifulSoup) -> str:
         return h1.text.strip()
     title_tag = soup.find("title")
     if title_tag:
-        return title_tag.text.strip().split("|")[0].strip()
+        text = title_tag.text.strip()
+        for sep in ["|", "｜", " - ", " – ", " — ", "－"]:
+            if sep in text:
+                return text.split(sep)[0].strip()
+        return text
     return "タイトル不明"
 
 

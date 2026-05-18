@@ -85,8 +85,8 @@ if run_button:
 
     # Step 1: Scrape own article
     with st.status("自分の記事を取得中...", expanded=True) as status:
-        from scraper import scrape_article
-        my_article = scrape_article(article_url)
+        from apify_wrapper import scrape_url_with_apify
+        my_article = scrape_url_with_apify(article_url, apify_key)
 
         if my_article["error"]:
             st.error(f"記事の取得に失敗しました: {my_article['error']}")
