@@ -87,6 +87,9 @@ def _extract_title(soup: BeautifulSoup) -> str:
     h1 = soup.find("h1")
     if h1 and h1.text.strip():
         return h1.text.strip()
+    og = soup.find("meta", property="og:title")
+    if og and og.get("content", "").strip():
+        return og["content"].strip()
     title_tag = soup.find("title")
     if title_tag:
         text = title_tag.text.strip()
