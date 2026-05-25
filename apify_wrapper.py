@@ -23,6 +23,17 @@ _PAGE_FN = """async function pageFunction(context) {
 }"""
 
 
+def _get_dataset_id(run) -> str:
+    if run is None:
+        raise RuntimeError("Apify アクターの実行が失敗またはタイムアウトしました")
+    if isinstance(run, dict):
+        return run["defaultDatasetId"]
+    dataset_id = getattr(run, "default_dataset_id", None) or getattr(run, "defaultDatasetId", None)
+    if not dataset_id:
+        raise RuntimeError(f"データセット ID を取得できませんでした: {run!r}")
+    return dataset_id
+
+
 def scrape_url_with_apify(url: str, api_key: str) -> dict:
     client = ApifyClient(api_key)
     try:
@@ -31,7 +42,7 @@ def scrape_url_with_apify(url: str, api_key: str) -> dict:
             "pageFunction": _PAGE_FN,
             "maxRequestsPerCrawl": 1,
         })
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        items = list(client.dataset(_get_dataset_id(run)).iterate_items())
         if not items:
             return scrape_article(url)
         item = items[0]
@@ -72,15 +83,7 @@ def get_top10_competitors(keyword: str, api_key: str, country: str = "jp") -> Li
     if run is None:
         raise RuntimeError("Apify アクターの実行が失敗またはタイムアウトしました")
 
-    # apify-client のバージョンによって dict または Run オブジェクトが返る
-    if isinstance(run, dict):
-        dataset_id = run["defaultDatasetId"]
-    else:
-        dataset_id = getattr(run, "default_dataset_id", None) or getattr(run, "defaultDatasetId", None)
-    if not dataset_id:
-        raise RuntimeError(f"データセット ID を取得できませんでした: {run!r}")
-
-    items = list(client.dataset(dataset_id).iterate_items())
+    items = list(client.dataset(_get_dataset_id(run)).iterate_items())
 
     urls = _extract_urls(items)
 
@@ -97,7 +100,7 @@ def _scrape_urls_with_apify(urls: List[str], api_key: str) -> List[dict]:
             "pageFunction": _PAGE_FN,
             "maxRequestsPerCrawl": len(urls),
         })
-        items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+        items = list(client.dataset(_get_dataset_id(run)).iterate_items())
         by_url = {item.get("url", ""): item for item in items}
         results = []
         for url in urls:
