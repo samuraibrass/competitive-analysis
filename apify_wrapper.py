@@ -68,7 +68,19 @@ def get_top10_competitors(keyword: str, api_key: str, country: str = "jp") -> Li
     }
 
     run = client.actor("apify/google-search-scraper").call(run_input=run_input)
-    items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+
+    if run is None:
+        raise RuntimeError("Apify アクターの実行が失敗またはタイムアウトしました")
+
+    # apify-client のバージョンによって dict または Run オブジェクトが返る
+    if isinstance(run, dict):
+        dataset_id = run["defaultDatasetId"]
+    else:
+        dataset_id = getattr(run, "default_dataset_id", None) or getattr(run, "defaultDatasetId", None)
+    if not dataset_id:
+        raise RuntimeError(f"データセット ID を取得できませんでした: {run!r}")
+
+    items = list(client.dataset(dataset_id).iterate_items())
 
     urls = _extract_urls(items)
 
